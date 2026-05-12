@@ -19,6 +19,22 @@ async def test_missing_api_key_returns_400(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_cors_preflight_allows_localhost_alias():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.options(
+            "/chat",
+            headers={
+                "Origin": "http://127.0.0.1:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,x-libertai-api-key",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3000"
+
+
+@pytest.mark.anyio
 @respx.mock
 async def test_chat_maps_to_libertai(monkeypatch):
     monkeypatch.delenv("LIBERTAI_API_KEY", raising=False)

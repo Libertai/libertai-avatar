@@ -2,9 +2,10 @@
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Grid, OrbitControls, useGLTF } from "@react-three/drei";
-import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
+import { VRM, VRMLoaderPlugin, type VRMPose } from "@pixiv/three-vrm";
 import { Loader2, Mic, MicOff, Send, Settings, Volume2, VolumeX } from "lucide-react";
 import { Component, FormEvent, ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Euler, Quaternion } from "three";
 import type { Group } from "three";
 import { sendChatMessage } from "../lib/chat";
 import styles from "./page.module.css";
@@ -41,6 +42,21 @@ const AVATAR_PRESETS = [
 ] as const;
 
 const DEFAULT_VRM_URL = process.env.NEXT_PUBLIC_DEFAULT_VRM_URL ?? AVATAR_PRESETS[0].url;
+const idlePoseQuaternions = {
+  hips: new Quaternion(),
+  spine: new Quaternion(),
+  chest: new Quaternion(),
+  neck: new Quaternion(),
+  head: new Quaternion(),
+  leftShoulder: new Quaternion(),
+  rightShoulder: new Quaternion(),
+  leftUpperArm: new Quaternion(),
+  rightUpperArm: new Quaternion(),
+  leftLowerArm: new Quaternion(),
+  rightLowerArm: new Quaternion(),
+  leftHand: new Quaternion(),
+  rightHand: new Quaternion()
+};
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -298,6 +314,7 @@ function VrmAvatar({ url, speaking }: { url: string; speaking: boolean }) {
       group.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.4) * 0.08;
     }
     if (vrm) {
+      applyIdlePose(vrm, state.clock.elapsedTime, speaking);
       vrm.update(delta);
       const expression = vrm.expressionManager;
       if (expression) {
@@ -368,6 +385,45 @@ function AvatarPoster({ preset }: { preset?: (typeof AVATAR_PRESETS)[number] }) 
       )}
     </div>
   );
+}
+
+function applyIdlePose(vrm: VRM, elapsed: number, speaking: boolean) {
+  const breath = Math.sin(elapsed * 1.8) * 0.035;
+  const listen = Math.sin(elapsed * 0.7) * 0.025;
+  const gesture = speaking ? Math.sin(elapsed * 4.2) * 0.08 : 0;
+
+  idlePoseQuaternions.hips.setFromEuler(new Euler(0, listen * 0.25, 0));
+  idlePoseQuaternions.spine.setFromEuler(new Euler(breath * 0.35, 0, 0));
+  idlePoseQuaternions.chest.setFromEuler(new Euler(breath, listen * 0.2, 0));
+  idlePoseQuaternions.neck.setFromEuler(new Euler(-0.02 + breath * 0.2, listen * 0.45, 0));
+  idlePoseQuaternions.head.setFromEuler(new Euler(0.035 + breath * 0.18, listen, Math.sin(elapsed * 0.55) * 0.018));
+
+  idlePoseQuaternions.leftShoulder.setFromEuler(new Euler(0, 0, -0.08));
+  idlePoseQuaternions.rightShoulder.setFromEuler(new Euler(0, 0, 0.08));
+  idlePoseQuaternions.leftUpperArm.setFromEuler(new Euler(0.06, 0.05, -1.05 + gesture));
+  idlePoseQuaternions.rightUpperArm.setFromEuler(new Euler(0.06, -0.05, 1.05 + gesture));
+  idlePoseQuaternions.leftLowerArm.setFromEuler(new Euler(0.04, 0.08, -0.32));
+  idlePoseQuaternions.rightLowerArm.setFromEuler(new Euler(0.04, -0.08, 0.32));
+  idlePoseQuaternions.leftHand.setFromEuler(new Euler(0.04, 0.02, -0.08));
+  idlePoseQuaternions.rightHand.setFromEuler(new Euler(0.04, -0.02, 0.08));
+
+  const pose: VRMPose = {
+    hips: { rotation: idlePoseQuaternions.hips.toArray() },
+    spine: { rotation: idlePoseQuaternions.spine.toArray() },
+    chest: { rotation: idlePoseQuaternions.chest.toArray() },
+    neck: { rotation: idlePoseQuaternions.neck.toArray() },
+    head: { rotation: idlePoseQuaternions.head.toArray() },
+    leftShoulder: { rotation: idlePoseQuaternions.leftShoulder.toArray() },
+    rightShoulder: { rotation: idlePoseQuaternions.rightShoulder.toArray() },
+    leftUpperArm: { rotation: idlePoseQuaternions.leftUpperArm.toArray() },
+    rightUpperArm: { rotation: idlePoseQuaternions.rightUpperArm.toArray() },
+    leftLowerArm: { rotation: idlePoseQuaternions.leftLowerArm.toArray() },
+    rightLowerArm: { rotation: idlePoseQuaternions.rightLowerArm.toArray() },
+    leftHand: { rotation: idlePoseQuaternions.leftHand.toArray() },
+    rightHand: { rotation: idlePoseQuaternions.rightHand.toArray() }
+  };
+
+  vrm.humanoid?.setNormalizedPose(pose);
 }
 
 function canUseWebgl() {
