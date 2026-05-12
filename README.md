@@ -48,7 +48,8 @@ Open `http://localhost:3000`.
 
 - Browser speech recognition is currently best supported in Chromium-based browsers. The UI falls back to typed chat when unavailable.
 - Browser TTS uses local system voices through `speechSynthesis`.
-- The app starts with a local procedural 3D avatar so it works offline. Paste a hosted `.vrm` asset URL in settings to use a VRM character.
+- The app starts with a curated CC0 VRM avatar from the Open Source Avatars 100Avatars collection, hosted on Arweave. Pick another preset or paste a hosted `.vrm` asset URL in settings.
+- Avatar source: https://github.com/ToxSam/open-source-avatars
 
 ## Aleph Cloud
 

@@ -18,7 +18,29 @@ type Message = {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_LIBERTAI_MODEL ?? "hermes-3-8b-tee";
-const DEFAULT_VRM_URL = process.env.NEXT_PUBLIC_DEFAULT_VRM_URL ?? "";
+
+const AVATAR_PRESETS = [
+  {
+    name: "Rose",
+    license: "CC0",
+    url: "https://arweave.net/Ea1KXujzJatQgCFSMzGOzp_UtHqB1pyia--U3AtkMAY",
+    thumbnail: "https://arweave.net/MsKV9G8Dvzv1rOfU8aCLlxZ2PtzQ-J9ijkdkFU-ExPo"
+  },
+  {
+    name: "Polydancer",
+    license: "CC0",
+    url: "https://arweave.net/jPOg-G0MPH55ZQmamFhT9f8cHn-hjeAQ0mRO5gWeKMQ",
+    thumbnail: "https://arweave.net/SUPfb9dzBeLUUpJaEjGPGDkEE_6PylCs3_wU_Em69LM"
+  },
+  {
+    name: "Robert",
+    license: "CC0",
+    url: "https://arweave.net/gwG7w4bY-A5c3R6A6GOz3xBCgbPvkFQmqPIDtvnNsYI",
+    thumbnail: "https://arweave.net/LSVaeYnJnZzdlqu9C9Jm0BHf4wC8EZoqkZhMLdizrv8"
+  }
+] as const;
+
+const DEFAULT_VRM_URL = process.env.NEXT_PUBLIC_DEFAULT_VRM_URL ?? AVATAR_PRESETS[0].url;
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,9 +55,15 @@ export default function Home() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hasWebgl, setHasWebgl] = useState<boolean | null>(null);
 
   const speechRecognition = useMemo(() => getSpeechRecognition(), []);
   const canListen = Boolean(speechRecognition);
+  const selectedPreset = AVATAR_PRESETS.find((preset) => preset.url === avatarUrl);
+
+  useEffect(() => {
+    setHasWebgl(canUseWebgl());
+  }, []);
 
   async function sendMessage(content: string) {
     const trimmed = content.trim();
@@ -112,37 +140,33 @@ export default function Home() {
   return (
     <main className={styles.shell}>
       <section className={styles.stage} aria-label="Avatar stage">
-        <Canvas camera={{ position: [0, 0.72, 3.2], fov: 40 }}>
-          <color attach="background" args={["#111315"]} />
-          <CameraRig />
-          <ambientLight intensity={1.2} />
-          <directionalLight position={[2, 4, 3]} intensity={2.1} />
-          <AvatarErrorBoundary resetKey={avatarUrl} fallback={<FallbackAvatar speaking={isSpeaking || isLoading} />}>
-            <Suspense fallback={<FallbackAvatar speaking={isSpeaking || isLoading} />}>
-              <Avatar url={avatarUrl} speaking={isSpeaking || isLoading} />
-            </Suspense>
-          </AvatarErrorBoundary>
-          <Grid
-            position={[0, -0.95, 0]}
-            args={[8, 8]}
-            cellColor="#3a454c"
-            sectionColor="#78d6b6"
-            fadeDistance={7}
-            fadeStrength={1}
-          />
-          <Environment preset="city" />
-          <OrbitControls enablePan={false} minDistance={1.8} maxDistance={5} target={[0, 0.25, 0]} />
-        </Canvas>
-        {!avatarUrl.trim() ? (
-          <div className={styles.domAvatar} aria-hidden="true">
-            <div className={styles.domAvatarHead}>
-              <span className={styles.domAvatarEye} />
-              <span className={styles.domAvatarEye} />
-              <span className={isSpeaking || isLoading ? styles.domAvatarMouthSpeaking : styles.domAvatarMouth} />
-            </div>
-            <div className={styles.domAvatarBody} />
-          </div>
+        {hasWebgl && avatarUrl.trim() ? (
+          <Canvas camera={{ position: [0, 0.72, 3.2], fov: 40 }}>
+            <color attach="background" args={["#111315"]} />
+            <CameraRig />
+            <ambientLight intensity={1.2} />
+            <directionalLight position={[2, 4, 3]} intensity={2.1} />
+            <AvatarErrorBoundary resetKey={avatarUrl} fallback={null}>
+              <Suspense fallback={null}>
+                <VrmAvatar url={avatarUrl} speaking={isSpeaking || isLoading} />
+              </Suspense>
+            </AvatarErrorBoundary>
+            <Grid
+              position={[0, -0.95, 0]}
+              args={[8, 8]}
+              cellColor="#3a454c"
+              sectionColor="#78d6b6"
+              fadeDistance={7}
+              fadeStrength={1}
+            />
+            <Environment preset="city" />
+            <OrbitControls enablePan={false} minDistance={1.8} maxDistance={5} target={[0, 0.25, 0]} />
+          </Canvas>
         ) : null}
+        {avatarUrl.trim() && hasWebgl === false ? (
+          <AvatarPoster preset={selectedPreset} />
+        ) : null}
+        {!avatarUrl.trim() || hasWebgl === null ? <FallbackPortrait speaking={isSpeaking || isLoading} /> : null}
       </section>
 
       <aside className={styles.panel} aria-label="Avatar chat">
@@ -171,7 +195,24 @@ export default function Home() {
               <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} type="password" autoComplete="off" />
             </label>
             <label>
-              VRM URL
+              Avatar preset
+              <div className={styles.avatarPresets}>
+                {AVATAR_PRESETS.map((preset) => (
+                  <button
+                    className={avatarUrl === preset.url ? styles.avatarPresetActive : styles.avatarPreset}
+                    key={preset.url}
+                    onClick={() => setAvatarUrl(preset.url)}
+                    type="button"
+                  >
+                    <span className={styles.avatarPresetImage} style={{ backgroundImage: `url(${preset.thumbnail})` }} />
+                    <span>{preset.name}</span>
+                    <small>{preset.license}</small>
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label>
+              Custom VRM URL
               <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="Optional hosted .vrm URL" />
             </label>
           </div>
@@ -230,14 +271,6 @@ export default function Home() {
   );
 }
 
-function Avatar({ url, speaking }: { url: string; speaking: boolean }) {
-  if (!url.trim()) {
-    return <FallbackAvatar speaking={speaking} />;
-  }
-
-  return <VrmAvatar url={url} speaking={speaking} />;
-}
-
 function CameraRig() {
   const camera = useThree((state) => state.camera);
 
@@ -274,10 +307,24 @@ function VrmAvatar({ url, speaking }: { url: string; speaking: boolean }) {
   });
 
   if (!vrm) {
-    return <FallbackAvatar speaking={speaking} />;
+    return null;
   }
 
   return <primitive ref={group} object={vrm.scene} position={[0, -0.95, 0]} />;
+}
+
+function FallbackPortrait({ speaking }: { speaking: boolean }) {
+  return (
+    <div className={styles.domAvatar} aria-hidden="true">
+      <div className={styles.domAvatarBody} />
+      <div className={styles.domAvatarNeck} />
+      <div className={styles.domAvatarHead}>
+        <span className={styles.domAvatarEye} />
+        <span className={styles.domAvatarEye} />
+        <span className={speaking ? styles.domAvatarMouthSpeaking : styles.domAvatarMouth} />
+      </div>
+    </div>
+  );
 }
 
 class AvatarErrorBoundary extends Component<
@@ -305,40 +352,31 @@ class AvatarErrorBoundary extends Component<
   }
 }
 
-function FallbackAvatar({ speaking }: { speaking: boolean }) {
-  const head = useRef<Group>(null);
-  useFrame((state) => {
-    if (head.current) {
-      head.current.position.y = 0.78 + Math.sin(state.clock.elapsedTime * 2) * 0.025;
-    }
-  });
-
+function AvatarPoster({ preset }: { preset?: (typeof AVATAR_PRESETS)[number] }) {
   return (
-    <group>
-      <mesh position={[0, -0.25, 0]}>
-        <capsuleGeometry args={[0.42, 0.95, 10, 18]} />
-        <meshStandardMaterial color="#34414a" roughness={0.8} />
-      </mesh>
-      <group ref={head}>
-        <mesh position={[0, 0.78, 0]}>
-          <sphereGeometry args={[0.38, 32, 32]} />
-          <meshStandardMaterial color="#d6b48f" roughness={0.65} />
-        </mesh>
-        <mesh position={[-0.13, 0.84, 0.33]}>
-          <sphereGeometry args={[0.035, 16, 16]} />
-          <meshStandardMaterial color="#1b1f22" />
-        </mesh>
-        <mesh position={[0.13, 0.84, 0.33]}>
-          <sphereGeometry args={[0.035, 16, 16]} />
-          <meshStandardMaterial color="#1b1f22" />
-        </mesh>
-        <mesh position={[0, 0.68, 0.35]} scale={[1, speaking ? 1.8 : 0.6, 1]}>
-          <sphereGeometry args={[0.055, 16, 16]} />
-          <meshStandardMaterial color="#2b1517" />
-        </mesh>
-      </group>
-    </group>
+    <div className={styles.avatarPoster} aria-label={preset ? `${preset.name} avatar preview` : "Avatar preview"}>
+      {preset ? (
+        <>
+          <div className={styles.avatarPosterImage} style={{ backgroundImage: `url(${preset.thumbnail})` }} />
+          <div className={styles.avatarPosterMeta}>
+            <strong>{preset.name}</strong>
+            <span>{preset.license} VRM asset</span>
+          </div>
+        </>
+      ) : (
+        <FallbackPortrait speaking={false} />
+      )}
+    </div>
   );
+}
+
+function canUseWebgl() {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const canvas = document.createElement("canvas");
+  return Boolean(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
 }
 
 function getSpeechRecognition() {
