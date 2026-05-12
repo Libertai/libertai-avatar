@@ -1,0 +1,19 @@
+{
+  "name": "libertai-avatar",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @libertai-avatar/web",
+    "build": "npm run build --workspace @libertai-avatar/web",
+    "lint": "npm run lint --workspace @libertai-avatar/web",
+    "test": "npm run test --workspace @libertai-avatar/web",
+    "api:dev": "uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000",
+    "api:test": "python3 -m pytest apps/api/tests"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
