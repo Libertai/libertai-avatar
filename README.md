@@ -48,7 +48,7 @@ Open `http://localhost:3000`.
 
 - Browser speech recognition is currently best supported in Chromium-based browsers. The UI falls back to typed chat when unavailable.
 - Browser TTS uses local system voices through `speechSynthesis`.
-- The default VRM is a remote sample URL. Replace it in the app settings with a local or hosted `.vrm` asset for production.
+- The app starts with a local procedural 3D avatar so it works offline. Paste a hosted `.vrm` asset URL in settings to use a VRM character.
 
 ## Aleph Cloud
 

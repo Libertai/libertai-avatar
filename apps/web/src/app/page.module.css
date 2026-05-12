@@ -7,6 +7,108 @@
 .stage {
   min-height: 100vh;
   position: relative;
+  overflow: hidden;
+}
+
+.domAvatar {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(34vw, 360px);
+  min-width: 220px;
+  aspect-ratio: 0.72;
+  transform: translate(-50%, -46%);
+  pointer-events: none;
+  filter: drop-shadow(0 28px 50px rgb(0 0 0 / 0.38));
+}
+
+.domAvatar::before {
+  content: "";
+  position: absolute;
+  inset: 62% -34% 3%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgb(120 214 182 / 0.18), transparent 64%);
+}
+
+.domAvatarHead {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: 54%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #e1bd96, #b98766);
+  box-shadow: inset -22px -26px 45px rgb(73 45 30 / 0.28), inset 18px 18px 28px rgb(255 255 255 / 0.16);
+}
+
+.domAvatarHead::before {
+  content: "";
+  position: absolute;
+  inset: -9% -5% 50%;
+  border-radius: 48% 48% 42% 42%;
+  background: linear-gradient(135deg, #2d3438, #15191c);
+}
+
+.domAvatarEye {
+  position: absolute;
+  top: 49%;
+  width: 8%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #121619;
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 0.08);
+}
+
+.domAvatarEye:first-child {
+  left: 32%;
+}
+
+.domAvatarEye:nth-child(2) {
+  right: 32%;
+}
+
+.domAvatarMouth,
+.domAvatarMouthSpeaking {
+  position: absolute;
+  left: 50%;
+  top: 68%;
+  width: 14%;
+  height: 4%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #32181a;
+  transition: height 160ms ease, border-radius 160ms ease;
+}
+
+.domAvatarMouthSpeaking {
+  height: 13%;
+  border-radius: 50%;
+}
+
+.domAvatarBody {
+  position: absolute;
+  left: 50%;
+  bottom: 7%;
+  width: 74%;
+  height: 58%;
+  transform: translateX(-50%);
+  border-radius: 42% 42% 18% 18%;
+  background: linear-gradient(145deg, #42515b, #20272d 58%, #161b1f);
+  box-shadow: inset -25px -28px 50px rgb(0 0 0 / 0.26), inset 18px 20px 36px rgb(120 214 182 / 0.1);
+}
+
+.domAvatarBody::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  width: 30%;
+  height: 38%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(#78d6b6, #40b88e);
+  opacity: 0.86;
 }
 
 .panel {

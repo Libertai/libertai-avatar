@@ -1,10 +1,10 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Grid, OrbitControls, useGLTF } from "@react-three/drei";
 import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
 import { Loader2, Mic, MicOff, Send, Settings, Volume2, VolumeX } from "lucide-react";
-import { FormEvent, Suspense, useMemo, useRef, useState } from "react";
+import { Component, FormEvent, ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { sendChatMessage } from "../lib/chat";
 import styles from "./page.module.css";
@@ -18,9 +18,7 @@ type Message = {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_LIBERTAI_MODEL ?? "hermes-3-8b-tee";
-const DEFAULT_VRM_URL =
-  process.env.NEXT_PUBLIC_DEFAULT_VRM_URL ??
-  "https://cdn.jsdelivr.net/gh/vrm-c/vrm-specification@master/samples/VRM1_Constraint_Twist_Sample.vrm";
+const DEFAULT_VRM_URL = process.env.NEXT_PUBLIC_DEFAULT_VRM_URL ?? "";
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -114,13 +112,16 @@ export default function Home() {
   return (
     <main className={styles.shell}>
       <section className={styles.stage} aria-label="Avatar stage">
-        <Canvas camera={{ position: [0, 1.45, 3.2], fov: 32 }}>
+        <Canvas camera={{ position: [0, 0.72, 3.2], fov: 40 }}>
           <color attach="background" args={["#111315"]} />
+          <CameraRig />
           <ambientLight intensity={1.2} />
           <directionalLight position={[2, 4, 3]} intensity={2.1} />
-          <Suspense fallback={<FallbackAvatar speaking={isSpeaking || isLoading} />}>
-            <Avatar url={avatarUrl} speaking={isSpeaking || isLoading} />
-          </Suspense>
+          <AvatarErrorBoundary resetKey={avatarUrl} fallback={<FallbackAvatar speaking={isSpeaking || isLoading} />}>
+            <Suspense fallback={<FallbackAvatar speaking={isSpeaking || isLoading} />}>
+              <Avatar url={avatarUrl} speaking={isSpeaking || isLoading} />
+            </Suspense>
+          </AvatarErrorBoundary>
           <Grid
             position={[0, -0.95, 0]}
             args={[8, 8]}
@@ -130,8 +131,18 @@ export default function Home() {
             fadeStrength={1}
           />
           <Environment preset="city" />
-          <OrbitControls enablePan={false} minDistance={1.8} maxDistance={5} target={[0, 0.8, 0]} />
+          <OrbitControls enablePan={false} minDistance={1.8} maxDistance={5} target={[0, 0.25, 0]} />
         </Canvas>
+        {!avatarUrl.trim() ? (
+          <div className={styles.domAvatar} aria-hidden="true">
+            <div className={styles.domAvatarHead}>
+              <span className={styles.domAvatarEye} />
+              <span className={styles.domAvatarEye} />
+              <span className={isSpeaking || isLoading ? styles.domAvatarMouthSpeaking : styles.domAvatarMouth} />
+            </div>
+            <div className={styles.domAvatarBody} />
+          </div>
+        ) : null}
       </section>
 
       <aside className={styles.panel} aria-label="Avatar chat">
@@ -161,7 +172,7 @@ export default function Home() {
             </label>
             <label>
               VRM URL
-              <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
+              <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="Optional hosted .vrm URL" />
             </label>
           </div>
         ) : null}
@@ -220,6 +231,24 @@ export default function Home() {
 }
 
 function Avatar({ url, speaking }: { url: string; speaking: boolean }) {
+  if (!url.trim()) {
+    return <FallbackAvatar speaking={speaking} />;
+  }
+
+  return <VrmAvatar url={url} speaking={speaking} />;
+}
+
+function CameraRig() {
+  const camera = useThree((state) => state.camera);
+
+  useEffect(() => {
+    camera.lookAt(0, 0.25, 0);
+  }, [camera]);
+
+  return null;
+}
+
+function VrmAvatar({ url, speaking }: { url: string; speaking: boolean }) {
   const group = useRef<Group>(null);
   const gltf = useGLTF(
     url,
@@ -249,6 +278,31 @@ function Avatar({ url, speaking }: { url: string; speaking: boolean }) {
   }
 
   return <primitive ref={group} object={vrm.scene} position={[0, -0.95, 0]} />;
+}
+
+class AvatarErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode; resetKey: string },
+  { hasError: boolean; resetKey: string }
+> {
+  state = { hasError: false, resetKey: this.props.resetKey };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  static getDerivedStateFromProps(
+    props: { resetKey: string },
+    state: { hasError: boolean; resetKey: string }
+  ) {
+    if (props.resetKey !== state.resetKey) {
+      return { hasError: false, resetKey: props.resetKey };
+    }
+    return null;
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
 }
 
 function FallbackAvatar({ speaking }: { speaking: boolean }) {
