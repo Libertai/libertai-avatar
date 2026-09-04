@@ -21,7 +21,7 @@ describe("sendChatMessage", () => {
       messages: [{ role: "user", content: "Hi" }]
     });
 
-    expect(message).toEqual({ role: "assistant", content: "Hello." });
+    expect(message).toEqual({ role: "assistant", content: "Hello.", toolCalls: [] });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/chat",
       expect.objectContaining({

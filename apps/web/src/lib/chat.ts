@@ -5,9 +5,16 @@ export type ChatMessage = {
   content: string;
 };
 
+export type ToolCallRecord = {
+  name: string;
+  arguments: Record<string, unknown>;
+  result: string;
+};
+
 export type AssistantMessage = {
   role: "assistant";
   content: string;
+  toolCalls: ToolCallRecord[];
 };
 
 export type SendChatInput = {
@@ -16,6 +23,7 @@ export type SendChatInput = {
   persona: string;
   model: string;
   apiKey?: string;
+  scenario?: string;
 };
 
 export async function sendChatMessage(input: SendChatInput): Promise<AssistantMessage> {
@@ -28,7 +36,8 @@ export async function sendChatMessage(input: SendChatInput): Promise<AssistantMe
     body: JSON.stringify({
       persona: input.persona,
       model: input.model,
-      messages: input.messages
+      messages: input.messages,
+      scenario: input.scenario
     })
   });
 
@@ -37,6 +46,6 @@ export async function sendChatMessage(input: SendChatInput): Promise<AssistantMe
     throw new Error(body.detail ?? `API request failed with ${response.status}`);
   }
 
-  const data = (await response.json()) as { content: string };
-  return { role: "assistant", content: data.content };
+  const data = (await response.json()) as { content: string; tool_calls?: ToolCallRecord[] };
+  return { role: "assistant", content: data.content, toolCalls: data.tool_calls ?? [] };
 }
