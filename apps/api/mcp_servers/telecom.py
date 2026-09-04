@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+import _serve
+
 mcp = FastMCP("telecom")
 
 ACCOUNTS = {
@@ -77,4 +79,4 @@ def list_upgrades(account_number: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    _serve.serve(mcp)

@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 
 from mcp.server.fastmcp import FastMCP
 
+import _serve
+
 mcp = FastMCP("pizzeria")
 
 # Delivery zones keyed by postcode prefix, with the minutes each adds to the base time.
@@ -58,4 +60,4 @@ def check_order(order_number: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    _serve.serve(mcp)

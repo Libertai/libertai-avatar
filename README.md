@@ -150,12 +150,23 @@ export LD_LIBRARY_PATH=$(nix-build '<nixpkgs>' -A stdenv.cc.cc.lib --no-out-link
 - The app starts with a curated CC0 VRM avatar from the Open Source Avatars 100Avatars collection, hosted on Arweave. Pick another preset or paste a hosted `.vrm` asset URL in settings.
 - Avatar source: https://github.com/ToxSam/open-source-avatars
 
-## Aleph Cloud
+## Deployment
 
-The API is a plain ASGI app at `apps.api.main:app`, which is the intended deployment unit for Aleph Cloud functions. For v1, package the `apps/api` directory with its Python dependencies and configure:
+The API is a plain ASGI app at `apps.api.main:app`. Four things it needs that a plain proxy did not:
 
-- `LIBERTAI_API_KEY`
-- `LIBERTAI_BASE_URL=https://api.libertai.io`
-- `LIBERTAI_DEFAULT_MODEL=hermes-3-8b-tee`
+- **Writable storage** for `AVATAR_DB` (scenarios and the MCP registry) and `AVATAR_SECRET_KEY_FILE`. Set `AVATAR_SECRET_KEY` from the environment instead of relying on the generated key file, or a redeploy onto fresh storage makes stored MCP credentials unreadable.
+- **Voice files**, if you want server speech. They are gitignored and total a few hundred MB; ship them in the image or mount them and point `PIPER_VOICES_DIR` at them.
+- **A Whisper model**, if you want local transcription. It downloads on first use into the HuggingFace cache, so give that a writable, persistent path or bake it into the image.
+- **`ADMIN_TOKEN`**, before the API is reachable from anywhere but your laptop.
 
-Keep the web app as a static/Next deployment and point `NEXT_PUBLIC_API_BASE_URL` at the deployed function URL.
+### MCP servers on a serverless host
+
+The demo servers default to `stdio`, which means the API spawns them as subprocesses. **A serverless function generally cannot do that.** Each server can also listen over HTTP:
+
+```bash
+MCP_TRANSPORT=http MCP_HOST=0.0.0.0 MCP_PORT=8081 python apps/api/mcp_servers/clinic.py
+```
+
+Deploy them as their own services and register them by URL (`transport: "http"`, `url: "https://…/mcp"`) instead of by command. Verified working end to end: a server started this way lists its tools and answers calls through the same client the stdio path uses.
+
+Set `LIBERTAI_API_KEY`, `LIBERTAI_BASE_URL` and `LIBERTAI_DEFAULT_MODEL` as before. Keep the web app as a Next deployment and point `NEXT_PUBLIC_API_BASE_URL` at the API, and `CORS_ALLOW_ORIGINS` at the web origin.

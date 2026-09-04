@@ -10,6 +10,7 @@ from datetime import date, timedelta
 
 from mcp.server.fastmcp import FastMCP
 
+import _serve
 import _state  # sibling module: stdio servers run as scripts, so their own directory is on sys.path
 
 mcp = FastMCP("flights")
@@ -104,4 +105,4 @@ def check_booking(reference: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    _serve.serve(mcp)
