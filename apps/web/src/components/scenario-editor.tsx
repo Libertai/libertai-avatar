@@ -71,7 +71,9 @@ export default function ScenarioEditor({ initial }: { initial?: Scenario }) {
     const mcp = selected ? scenario.mcp.filter((item) => item !== name) : [...scenario.mcp, name];
     // Drop allowlisted tools that belonged to a server that is no longer selected.
     const available = new Set(mcp.flatMap((server) => tools[server] ?? []));
-    update({ mcp, tools: scenario.tools?.filter((tool) => available.has(tool)) ?? null });
+    const kept = scenario.tools?.filter((tool) => available.has(tool)) ?? [];
+    // An empty list means "allow nothing" on the API; null is what means "allow all".
+    update({ mcp, tools: kept.length > 0 ? kept : null });
   }
 
   function toggleTool(name: string) {

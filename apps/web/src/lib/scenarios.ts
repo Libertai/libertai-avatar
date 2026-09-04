@@ -96,6 +96,12 @@ function detailToMessage(detail: unknown): string | null {
   return null;
 }
 
+/** Whether the API requires an admin token. Readable without one, unlike /admin/scenarios. */
+export async function fetchAdminProtection(apiBaseUrl: string): Promise<boolean> {
+  const data = await request<{ admin_protected?: boolean }>(apiBaseUrl, "/health");
+  return data.admin_protected ?? false;
+}
+
 export async function fetchScenario(apiBaseUrl: string, slug: string): Promise<ScenarioSummary> {
   return request<ScenarioSummary>(apiBaseUrl, `/scenarios/${slug}`);
 }

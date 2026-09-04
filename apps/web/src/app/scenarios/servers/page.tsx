@@ -96,6 +96,7 @@ export default function McpServersPage() {
 
       {draft ? (
         <ServerForm
+          key={draft.name || "new-server"}
           server={draft}
           onCancel={() => setDraft(null)}
           onSave={async (server) => {

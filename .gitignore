@@ -15,3 +15,4 @@ apps/api/voices/*.onnx
 apps/api/voices/*.onnx.json
 apps/api/avatar.db
 apps/api/.secret_key
+apps/api/.mcp_demo_state/

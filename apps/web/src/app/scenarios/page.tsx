@@ -6,6 +6,7 @@ import {
   adminToken,
   deleteScenario,
   duplicateScenario,
+  fetchAdminProtection,
   fetchAdminScenarios,
   saveScenario,
   setAdminToken,
@@ -23,12 +24,17 @@ export default function ScenariosPage() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    // Ask /health first: listing scenarios needs the very token this page collects, so a
+    // protected API would otherwise answer 401 and leave no way to enter one.
+    const isProtected = await fetchAdminProtection(API_BASE_URL).catch(() => false);
+    setProtectedApi(isProtected);
+
     try {
-      const { scenarios: loaded, protected: isProtected } = await fetchAdminScenarios(API_BASE_URL);
+      const { scenarios: loaded } = await fetchAdminScenarios(API_BASE_URL);
       setScenarios(loaded);
-      setProtectedApi(isProtected);
       setError(null);
     } catch (err) {
+      setScenarios([]);
       setError(err instanceof Error ? err.message : "Could not load scenarios.");
     } finally {
       setLoading(false);

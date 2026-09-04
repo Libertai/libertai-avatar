@@ -10,6 +10,8 @@ from datetime import date, timedelta
 
 from mcp.server.fastmcp import FastMCP
 
+import _state  # sibling module: stdio servers run as scripts, so their own directory is on sys.path
+
 mcp = FastMCP("flights")
 
 AIRPORTS = {
@@ -26,9 +28,6 @@ ROUTES = {
     ("CDG", "DXB"): [("AV330", "22:15", "07:45", 372.0)],
     ("CDG", "CMN"): [("AV440", "08:40", "10:25", 143.0), ("AV448", "19:10", "20:55", 121.0)],
 }
-
-_bookings: dict[str, dict] = {}
-
 
 @mcp.tool()
 def list_airports() -> str:
@@ -76,12 +75,14 @@ def book_flight(flight_number: str, passenger_name: str, day_offset: int = 7) ->
 
             when = date.today() + timedelta(days=max(0, day_offset))
             reference = f"{flight_number}-{when.strftime('%m%d')}"
-            _bookings[reference] = {
+            bookings = _state.load("flights")
+            bookings[reference] = {
                 "passenger": passenger_name,
                 "route": f"{origin}-{destination}",
                 "when": f"{when.isoformat()} {departure}",
                 "price": price,
             }
+            _state.save("flights", bookings)
             return (
                 f"Booked {passenger_name} on {flight_number}, {origin} to {destination}, "
                 f"{when.strftime('%A %d %B')} at {departure}, {price} EUR. Reference {reference}."
@@ -93,7 +94,7 @@ def book_flight(flight_number: str, passenger_name: str, day_offset: int = 7) ->
 @mcp.tool()
 def check_booking(reference: str) -> str:
     """Look up a booking by its reference."""
-    booking = _bookings.get(reference.strip().upper())
+    booking = _state.load("flights").get(reference.strip().upper())
     if booking is None:
         return f"No booking found for {reference}."
     return (

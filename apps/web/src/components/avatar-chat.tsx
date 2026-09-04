@@ -124,6 +124,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   const keepAliveRef = useRef<number | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
+  const turnRef = useRef(0);
   const prefixRef = useRef("");
   const micDotRef = useRef<HTMLSpanElement>(null);
   const micMeterRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number } | null>(null);
@@ -271,8 +272,17 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     setIsLoading(true);
 
     // A scenario that calls tools leaves the avatar silent for seconds. Say what a real
-    // person would say while they look something up.
-    const filler = scenario ? window.setTimeout(() => speak(thinkingAloud(language)), FILLER_DELAY_MS) : null;
+    // person would say while they look something up. The turn counter lets a reply that
+    // lands first discard the filler, whose own synthesis would otherwise resolve later
+    // and cut the answer off.
+    const turn = (turnRef.current += 1);
+    const filler = scenario
+      ? window.setTimeout(() => {
+          if (turnRef.current === turn) {
+            speak(thinkingAloud(language), turn);
+          }
+        }, FILLER_DELAY_MS)
+      : null;
 
     try {
       const assistant = await sendChatMessage({
@@ -284,6 +294,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
         scenario: scenario?.slug
       });
       setToolCalls(assistant.toolCalls);
+      turnRef.current += 1;
       setMessages([...nextMessages, assistant]);
       speak(assistant.content);
     } catch (err) {
@@ -314,22 +325,22 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     setIsSpeaking(false);
   }
 
-  function speak(text: string) {
-    if (!voiceEnabled) {
+  function speak(text: string, turn?: number) {
+    if (!voiceEnabled || !text.trim()) {
       return;
     }
-    utter(text);
+    utter(text, turn);
   }
 
-  function utter(text: string) {
+  function utter(text: string, turn?: number) {
     if (engine === "server") {
-      void utterOnServer(text);
+      void utterOnServer(text, turn);
       return;
     }
     utterInBrowser(text);
   }
 
-  async function utterOnServer(text: string) {
+  async function utterOnServer(text: string, turn?: number) {
     if (!selectedServerVoice) {
       setError("No server voices are available. Add a Piper .onnx voice file to apps/api/voices.");
       return;
@@ -343,6 +354,11 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
         speed,
         speaker: speaker < selectedServerVoice.speakers ? speaker : 0
       });
+      // The turn moved on while this was synthesizing: playing it now would stop whatever
+      // is speaking and talk over the answer.
+      if (turn !== undefined && turnRef.current !== turn) {
+        return;
+      }
       stopSpeaking();
 
       const context = new AudioContext();

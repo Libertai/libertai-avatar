@@ -215,3 +215,32 @@ async def test_a_failing_server_reports_why_instead_of_raising() -> None:
     assert response.status_code == 200
     assert response.json()["ok"] is False
     assert response.json()["tools"] == []
+
+
+@pytest.mark.anyio
+async def test_cors_preflight_allows_the_admin_writes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The admin UI saves with PUT and removes with DELETE; a preflight refusal blocks both."""
+    async with await _client() as client:
+        for method in ("PUT", "DELETE"):
+            response = await client.options(
+                "/admin/scenarios/pizzeria",
+                headers={
+                    "Origin": "http://localhost:3000",
+                    "Access-Control-Request-Method": method,
+                    "Access-Control-Request-Headers": "content-type,x-admin-token",
+                },
+            )
+            assert response.status_code == 200, method
+            assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+@pytest.mark.anyio
+async def test_health_reports_whether_admin_is_protected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The scenarios page reads this without a token, which /admin/scenarios cannot give it."""
+    async with await _client() as client:
+        open_api = await client.get("/health")
+        monkeypatch.setenv("ADMIN_TOKEN", "s3cret")
+        guarded = await client.get("/health")
+
+    assert open_api.json()["admin_protected"] is False
+    assert guarded.json()["admin_protected"] is True
