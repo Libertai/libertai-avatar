@@ -267,6 +267,109 @@
   outline: none;
 }
 
+.micDot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  transform: scale(calc(1 + var(--mic-level, 0) * 0.9));
+  box-shadow: 0 0 calc(var(--mic-level, 0) * 10px) #ff4d4f;
+  animation: micBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes micBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .micDot {
+    animation: none;
+  }
+}
+
+.speedControl {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.speedOption,
+.speedOptionActive {
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.speedOptionActive {
+  background: var(--accent);
+  color: #0d1114;
+}
+
+.voicePicker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.voicePicker select {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111518;
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+}
+
+.voicePicker button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 0 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.voicePicker button:disabled,
+.voicePicker select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings input[type="file"] {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.settings input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .settings input:focus,
 .settings textarea:focus,
 .composer textarea:focus {
@@ -329,15 +432,30 @@
 }
 
 .composer {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 16px 20px 20px;
   border-top: 1px solid var(--line);
 }
 
+.composerInput {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .iconButton,
 .sendButton {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -385,8 +503,11 @@
   }
 
   .composer {
-    grid-template-columns: 40px minmax(0, 1fr) 40px 40px;
     padding: 12px 16px 16px;
+  }
+
+  .composerInput {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
   }
 
   .iconButton,
@@ -400,4 +521,61 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.toolCalls {
+  display: grid;
+  gap: 8px;
+  margin: 0 20px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.toolCall {
+  display: grid;
+  gap: 2px;
+}
+
+.toolCall code {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #303840;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.settingsNote {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: #111518;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settingsNote a {
+  color: var(--accent);
 }
