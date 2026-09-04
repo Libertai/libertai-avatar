@@ -1,8 +1,10 @@
 fastapi==0.115.12
 httpx==0.28.1
+mcp==1.29.1
 onnx==1.22.0
 piper-tts==1.7.0
 pytest==8.3.5
 python-dotenv==1.1.0
 respx==0.22.0
+starlette==0.46.2
 uvicorn[standard]==0.34.2

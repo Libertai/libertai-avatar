@@ -70,7 +70,71 @@ async def test_chat_maps_to_libertai(monkeypatch):
         "role": "assistant",
         "content": "Hello from LibertAI.",
         "model": "custom-model",
+        "tool_calls": [],
     }
     request = route.calls[0].request
     assert request.headers["authorization"] == "Bearer demo-key"
-    assert json.loads(request.content)["messages"][0] == {"role": "system", "content": "You are concise."}
+    system_prompt = json.loads(request.content)["messages"][0]
+    assert system_prompt["role"] == "system"
+    assert system_prompt["content"].startswith("You are concise.")
+    assert "no tools" in system_prompt["content"]
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_chat_strips_hallucinated_tool_calls(monkeypatch):
+    monkeypatch.setenv("LIBERTAI_API_KEY", "server-key")
+    respx.post("https://api.libertai.io/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": 'Sure thing.\n<tool_call>\n{"name": "speech_to_text"}\n</tool_call>',
+                        }
+                    }
+                ]
+            },
+        )
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/chat", json={"messages": [{"role": "user", "content": "Hi"}]})
+
+    assert response.status_code == 200
+    assert response.json()["content"] == "Sure thing."
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_chat_rejects_replies_that_are_only_a_tool_call(monkeypatch):
+    monkeypatch.setenv("LIBERTAI_API_KEY", "server-key")
+    respx.post("https://api.libertai.io/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            json={"choices": [{"message": {"content": '<tool_call>{"name": "speech_to_text"}</tool_call>'}}]},
+        )
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/chat", json={"messages": [{"role": "user", "content": "Hi"}]})
+
+    assert response.status_code == 502
+    assert "tool call" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_chat_adds_no_tools_instruction_without_persona(monkeypatch):
+    monkeypatch.setenv("LIBERTAI_API_KEY", "server-key")
+    route = respx.post("https://api.libertai.io/v1/chat/completions").mock(
+        return_value=Response(200, json={"choices": [{"message": {"content": "Hello."}}]}),
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await client.post("/chat", json={"messages": [{"role": "user", "content": "Hi"}]})
+
+    messages = json.loads(route.calls[0].request.content)["messages"]
+    assert messages[0]["role"] == "system"
+    assert "no tools" in messages[0]["content"]

@@ -1,0 +1,26 @@
+{
+  "pizzeria": {
+    "description": "Delivery estimates and order status for Tony's Pizzeria.",
+    "transport": "stdio",
+    "command": "python",
+    "args": ["apps/api/mcp_servers/pizzeria.py"]
+  },
+  "clinic": {
+    "description": "Appointment book for Clinique Saint-Jean.",
+    "transport": "stdio",
+    "command": "python",
+    "args": ["apps/api/mcp_servers/clinic.py"]
+  },
+  "telecom": {
+    "description": "Account, network and plan lookups for Nova Telecom.",
+    "transport": "stdio",
+    "command": "python",
+    "args": ["apps/api/mcp_servers/telecom.py"]
+  },
+  "flights": {
+    "description": "Flight search and booking for Aviva Air.",
+    "transport": "stdio",
+    "command": "python",
+    "args": ["apps/api/mcp_servers/flights.py"]
+  }
+}
