@@ -11,6 +11,7 @@ import type { Group } from "three";
 import { sendChatMessage, type ToolCallRecord } from "../lib/chat";
 import { loadGestureClip } from "../lib/gestures";
 import type { ScenarioSummary } from "../lib/scenarios";
+import { fetchSttStatus, recordingMimeType, transcribeAudio } from "../lib/stt";
 import {
   fetchServerVoices,
   languageLabel,
@@ -116,6 +117,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   const [speed, setSpeed] = useState(scenario?.speed ?? 1);
   const [language, setLanguage] = useState(scenario?.language ?? DEFAULT_LANGUAGE);
   const [speaker, setSpeaker] = useState(0);
+  const [serverStt, setServerStt] = useState(false);
+  const [listenPreference, setListenPreference] = useState<Engine>("server");
+  const [transcribing, setTranscribing] = useState(false);
   const [gestureUrl, setGestureUrl] = useState("");
   const [gestureFileName, setGestureFileName] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<ToolCallRecord[]>([]);
@@ -128,6 +132,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   const prefixRef = useRef("");
   const micDotRef = useRef<HTMLSpanElement>(null);
   const micMeterRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number } | null>(null);
+  const recorderRef = useRef<{ recorder: MediaRecorder; chunks: Blob[] } | null>(null);
   const audioRef = useRef<{
     context: AudioContext;
     source: AudioBufferSourceNode;
@@ -158,6 +163,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   // Fall back to the server whenever the browser has no voice for the chosen language.
   const engine: Engine = enginePreference === "browser" && !selectedVoice ? "server" : enginePreference;
   const canPlayVoice = engine === "browser" ? Boolean(selectedVoice) : Boolean(selectedServerVoice);
+  // Browser recognition is a cloud service; fall back to it only when the server cannot listen.
+  const listenEngine: Engine = listenPreference === "server" && serverStt ? "server" : "browser";
+  const canDictate = listenEngine === "server" ? serverStt : canListen;
 
   useEffect(() => {
     setHasWebgl(canUseWebgl());
@@ -165,6 +173,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     fetchServerVoices(API_BASE_URL)
       .then(setServerVoices)
       .catch(() => setServerVoices([]));
+    fetchSttStatus(API_BASE_URL)
+      .then((status) => setServerStt(status.available))
+      .catch(() => setServerStt(false));
   }, []);
 
   useEffect(() => {
@@ -432,6 +443,27 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     window.setTimeout(() => synth.speak(utterance), 0);
   }
 
+  /** Server dictation: record while listening, transcribe on stop, then send. */
+  async function toggleServerListening() {
+    if (recorderRef.current) {
+      const dictated = await finishRecording();
+      stopMicMeter();
+      setIsListening(false);
+
+      const spoken = [prefixRef.current, dictated].filter(Boolean).join(" ").trim();
+      prefixRef.current = "";
+      if (spoken) {
+        setDraft(spoken);
+        void sendMessage(spoken);
+      }
+      return;
+    }
+
+    prefixRef.current = draft.trim();
+    setIsListening(true);
+    await startMicMeter();
+  }
+
   async function startMicMeter() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -454,8 +486,59 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       };
 
       micMeterRef.current = { stream, context, frame: requestAnimationFrame(measure) };
+      if (listenEngine === "server") {
+        startRecording(stream);
+      }
     } catch {
       // The level meter is decorative; dictation still works without microphone metering.
+    }
+  }
+
+  function startRecording(stream: MediaStream) {
+    const mimeType = recordingMimeType();
+    if (!mimeType) {
+      setError("This browser cannot record audio, so server transcription is unavailable.");
+      return;
+    }
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+    recorderRef.current = { recorder, chunks };
+    recorder.start();
+  }
+
+  /** Stop recording and hand the audio to the server, which returns the transcript. */
+  async function finishRecording(): Promise<string> {
+    const active = recorderRef.current;
+    recorderRef.current = null;
+    if (!active || active.recorder.state === "inactive") {
+      return "";
+    }
+
+    const recorded = new Promise<Blob>((resolve) => {
+      active.recorder.onstop = () => resolve(new Blob(active.chunks, { type: active.recorder.mimeType }));
+    });
+    active.recorder.stop();
+    const audio = await recorded;
+
+    if (audio.size === 0) {
+      return "";
+    }
+
+    setTranscribing(true);
+    try {
+      const { text } = await transcribeAudio({ apiBaseUrl: API_BASE_URL, audio, language });
+      return text;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not transcribe the recording.");
+      return "";
+    } finally {
+      setTranscribing(false);
     }
   }
 
@@ -482,6 +565,12 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       recognition.stop();
     }
 
+    if (recorderRef.current && recorderRef.current.recorder.state !== "inactive") {
+      recorderRef.current.recorder.onstop = null;
+      recorderRef.current.recorder.stop();
+    }
+    recorderRef.current = null;
+
     stopMicMeter();
     transcriptRef.current = "";
     prefixRef.current = "";
@@ -489,6 +578,11 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   }
 
   function toggleListening() {
+    if (listenEngine === "server") {
+      void toggleServerListening();
+      return;
+    }
+
     if (!speechRecognition) {
       return;
     }
@@ -586,7 +680,17 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
         <header className={styles.header}>
           <div>
             <h1>{scenario?.name ?? "LibertAI Avatar"}</h1>
-            <p>{isLoading ? "Thinking" : isSpeaking ? "Speaking" : "Ready"}</p>
+            <p>
+              {transcribing
+                ? "Transcribing"
+                : isListening
+                  ? "Listening"
+                  : isLoading
+                    ? "Thinking"
+                    : isSpeaking
+                      ? "Speaking"
+                      : "Ready"}
+            </p>
           </div>
           <div className={styles.headerActions}>
             <Link className={styles.headerLink} href="/scenarios" title="All scenarios">
@@ -642,6 +746,21 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
                 ))}
               </select>
               <small>Sets the voice, the microphone language, and the language the avatar replies in.</small>
+            </label>
+            <label>
+              Microphone
+              <select
+                value={listenPreference}
+                onChange={(event) => setListenPreference(event.target.value as Engine)}
+              >
+                <option value="server">Server (Whisper){serverStt ? "" : " — unavailable"}</option>
+                <option value="browser">Browser recognition</option>
+              </select>
+              <small>
+                {listenEngine === "server"
+                  ? "Audio is transcribed on your server and never leaves it."
+                  : "Chromium sends the audio to Google to transcribe it."}
+              </small>
             </label>
             <label>
               Speech engine
@@ -813,12 +932,12 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
               className={styles.iconButton}
               type="button"
               onClick={toggleListening}
-              disabled={!canListen || isLoading}
+              disabled={!canDictate || isLoading || transcribing}
               title={
-                canListen
+                canDictate
                   ? isListening
                     ? "Stop recording and send"
-                    : "Start recording (click again to send)"
+                    : `Start recording (${listenEngine === "server" ? "transcribed on the server" : "browser recognition"})`
                   : "Speech recognition unavailable"
               }
             >

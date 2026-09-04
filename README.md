@@ -8,7 +8,7 @@ Open-source browser avatar chat system backed by LibertAI and designed for Aleph
 - **Scenarios**: named avatars with their own rules, dataset, voice and tools, each on its own link.
 - **MCP tools**: an avatar can call any MCP server for live data, over stdio, HTTP or SSE.
 - Local neural speech (Piper) in English, French, Spanish, German and Arabic, plus browser voices.
-- Click-to-talk speech recognition that follows the scenario's language.
+- Click-to-talk speech recognition, transcribed locally with Whisper by default.
 - FastAPI gateway that calls LibertAI's OpenAI-compatible chat completions API.
 - SQLite for scenarios and the MCP registry; conversations are never persisted.
 - Two credential modes:
@@ -104,6 +104,14 @@ Rules that matter when composing several servers:
 Third-party servers are untrusted on two axes: what they return (prompt injection — the system prompt tells the model to treat results as data, never instructions) and whether they answer at all (hence the timeouts and skip-on-failure).
 
 Two things to know when writing scenario rules: the demo datasets are deliberately fake, and no conversation is persisted — an order is summarized on screen and discarded. Keep it that way, or the doctor and telecom scenarios start collecting real personal data.
+
+## Speech to text
+
+`POST /stt/transcribe` transcribes a recording with Whisper (`faster-whisper`) on the same machine as everything else. The browser's own recognition is a cloud service — Chromium sends the audio to Google — which sits badly with a stack whose point is that inference stays where you put it, so the server engine is the default and the browser one is a fallback.
+
+The model is chosen with `WHISPER_MODEL` (default `base`, ~150MB) and downloads on first use. Measured on CPU with `int8`: 3.6s of speech transcribed in 0.6s once the model is warm, correctly hearing a spoken postcode. `GET /stt/status` reports whether the server can transcribe, and the microphone falls back to browser recognition when it cannot.
+
+Recording uses the microphone stream the level meter already opens, in whatever container the browser supports (`webm/opus` in Chromium). Whisper decodes it through PyAV, so no ffmpeg binary is needed.
 
 ## Avatar animation
 

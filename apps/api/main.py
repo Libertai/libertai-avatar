@@ -21,6 +21,7 @@ from apps.api.mcp_registry import router as mcp_router
 from apps.api.scenarios import Scenario, get_scenario
 from apps.api.scenarios import router as scenarios_router
 from apps.api.seed import seed
+from apps.api.stt import router as stt_router
 from apps.api.tts import router as tts_router
 
 load_dotenv("apps/api/.env")
@@ -103,6 +104,7 @@ app.add_middleware(
 app.include_router(tts_router)
 app.include_router(scenarios_router)
 app.include_router(mcp_router)
+app.include_router(stt_router)
 
 
 @app.get("/health")
