@@ -11,3 +11,7 @@ __pycache__/
 .env
 .env.local
 .DS_Store
+apps/api/voices/*.onnx
+apps/api/voices/*.onnx.json
+apps/api/avatar.db
+apps/api/.secret_key
