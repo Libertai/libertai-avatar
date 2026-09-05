@@ -3,6 +3,7 @@ import {
   fetchServerVoices,
   languageLabel,
   synthesizeSpeech,
+  takeSpeakable,
   thinkingAloud,
   toBcp47,
   visemeWeightsAt,
@@ -146,5 +147,57 @@ describe("thinkingAloud", () => {
 
   it("falls back to English", () => {
     expect(thinkingAloud("ja-JP")).toBe("Let me check that for you.");
+  });
+});
+
+describe("takeSpeakable", () => {
+  it("yields a sentence as soon as it is complete", () => {
+    // The separating space is consumed with the sentence, not left on the remainder.
+    expect(takeSpeakable("Good evening. What can I")).toEqual([["Good evening."], "What can I"]);
+  });
+
+  it("keeps an incomplete sentence buffered", () => {
+    expect(takeSpeakable("Good even")).toEqual([[], "Good even"]);
+  });
+
+  it("takes several sentences at once", () => {
+    const [chunks, rest] = takeSpeakable("One moment. I will check. Almost");
+    expect(chunks).toEqual(["One moment.", "I will check."]);
+    expect(rest.trim()).toBe("Almost");
+  });
+
+  it("does not split on a decimal point mid-number", () => {
+    const [chunks] = takeSpeakable("That is 9.50 euros for the margherita. And", true);
+    expect(chunks).toEqual(["That is 9.50 euros for the margherita.", "And"]);
+  });
+
+  it("holds a finished sentence until flush, since more may still arrive", () => {
+    expect(takeSpeakable("Ready when you are.")).toEqual([[], "Ready when you are."]);
+  });
+
+  it("breaks a very long clause at a word boundary", () => {
+    const long = `${"word ".repeat(60)}end`;
+    const [chunks, rest] = takeSpeakable(long);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks[0]!.endsWith("word")).toBe(true);
+    expect(`${chunks.join(" ")} ${rest}`.replace(/\s+/g, " ").trim()).toBe(long.trim());
+  });
+
+  it("flushes whatever is left when the reply ends", () => {
+    expect(takeSpeakable("No punctuation here", true)).toEqual([["No punctuation here"], ""]);
+  });
+
+  it("splits on a line break", () => {
+    const [chunks] = takeSpeakable("Here is the first line\nand the second");
+    expect(chunks).toEqual(["Here is the first line"]);
+  });
+
+  it("holds back a fragment too short to be worth speaking on its own", () => {
+    expect(takeSpeakable("Yes. And")).toEqual([[], "Yes. And"]);
+  });
+
+  it("returns nothing for empty input", () => {
+    expect(takeSpeakable("")).toEqual([[], ""]);
+    expect(takeSpeakable("   ", true)).toEqual([[], ""]);
   });
 });

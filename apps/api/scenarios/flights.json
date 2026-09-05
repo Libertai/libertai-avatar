@@ -16,6 +16,21 @@
     "check_in": "Online check-in opens 30 hours before departure.",
     "routes_served": "Direct flights from Paris CDG to London, New York, Dubai and Casablanca."
   },
-  "mcp": ["flights"],
-  "tools": ["list_airports", "search_flights", "book_flight", "check_booking"]
+  "collect": [
+    "passenger_name",
+    "route",
+    "flight",
+    "date",
+    "price",
+    "reference"
+  ],
+  "mcp": [
+    "flights"
+  ],
+  "tools": [
+    "list_airports",
+    "search_flights",
+    "book_flight",
+    "check_booking"
+  ]
 }

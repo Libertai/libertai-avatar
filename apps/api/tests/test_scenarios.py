@@ -5,7 +5,7 @@ import pytest
 import respx
 from httpx import ASGITransport, AsyncClient, Response
 
-from apps.api import main
+from apps.api import chat as chat_module
 from apps.api.main import app
 from apps.api.mcp_registry import McpServer, save_server
 from apps.api.scenarios import save_scenario, scenario_from_dict
@@ -80,7 +80,7 @@ async def test_unpublished_scenarios_are_hidden_from_the_public_list(pizzeria) -
 async def test_chat_sends_scenario_rules_and_data_as_the_system_prompt(
     pizzeria, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(main, "list_tools", _no_tools)
+    monkeypatch.setattr(chat_module, "list_tools", _no_tools)
     route = respx.post("https://api.libertai.io/v1/chat/completions").mock(return_value=_reply("Hello!"))
 
     async with await _client() as client:
@@ -98,12 +98,12 @@ async def test_chat_sends_scenario_rules_and_data_as_the_system_prompt(
 @pytest.mark.anyio
 @respx.mock
 async def test_chat_runs_a_tool_call_and_reports_it(pizzeria, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(main, "list_tools", _delivery_tool)
+    monkeypatch.setattr(chat_module, "list_tools", _delivery_tool)
 
     async def fake_call_tool(servers, name, arguments):
         return f"Delivery to {arguments['postcode']} takes 30 minutes."
 
-    monkeypatch.setattr(main, "call_tool", fake_call_tool)
+    monkeypatch.setattr(chat_module, "call_tool", fake_call_tool)
 
     respx.post("https://api.libertai.io/v1/chat/completions").mock(
         side_effect=[
@@ -143,12 +143,12 @@ async def test_chat_runs_a_tool_call_and_reports_it(pizzeria, monkeypatch: pytes
 async def test_chat_refuses_tools_outside_the_scenario_allowlist(
     pizzeria, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(main, "list_tools", _delivery_tool)
+    monkeypatch.setattr(chat_module, "list_tools", _delivery_tool)
 
     async def explode(servers, name, arguments):
         raise AssertionError(f"{name} should never be executed")
 
-    monkeypatch.setattr(main, "call_tool", explode)
+    monkeypatch.setattr(chat_module, "call_tool", explode)
 
     respx.post("https://api.libertai.io/v1/chat/completions").mock(
         side_effect=[
@@ -175,7 +175,7 @@ async def test_chat_keeps_tool_calls_when_tools_are_offered(
     pizzeria, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With tools offered the stripping must not fire, or genuine calls would vanish."""
-    monkeypatch.setattr(main, "list_tools", _delivery_tool)
+    monkeypatch.setattr(chat_module, "list_tools", _delivery_tool)
     respx.post("https://api.libertai.io/v1/chat/completions").mock(
         return_value=_reply("Sure. <tool_call> leftover </tool_call>")
     )
@@ -192,12 +192,12 @@ async def test_chat_keeps_tool_calls_when_tools_are_offered(
 @pytest.mark.anyio
 @respx.mock
 async def test_chat_stops_after_the_tool_round_limit(pizzeria, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(main, "list_tools", _delivery_tool)
+    monkeypatch.setattr(chat_module, "list_tools", _delivery_tool)
 
     async def fake_call_tool(servers, name, arguments):
         return "ok"
 
-    monkeypatch.setattr(main, "call_tool", fake_call_tool)
+    monkeypatch.setattr(chat_module, "call_tool", fake_call_tool)
     respx.post("https://api.libertai.io/v1/chat/completions").mock(
         return_value=_reply(
             None, [{"id": "c", "function": {"name": "check_delivery", "arguments": '{"postcode": "75011"}'}}]
@@ -220,7 +220,7 @@ async def test_chat_survives_a_broken_mcp_server(pizzeria, monkeypatch: pytest.M
     async def broken(servers, allowed=None):
         raise RuntimeError("server would not start")
 
-    monkeypatch.setattr(main, "list_tools", broken)
+    monkeypatch.setattr(chat_module, "list_tools", broken)
     respx.post("https://api.libertai.io/v1/chat/completions").mock(return_value=_reply("Hello!"))
 
     async with await _client() as client:

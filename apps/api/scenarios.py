@@ -40,6 +40,8 @@ class Scenario(BaseModel):
     model: str | None = Field(default=None, max_length=128)
     speed: float = Field(default=1.0, ge=0.5, le=2.0)
     published: bool = True
+    # What the avatar is meant to come away with, e.g. ["phone", "items", "address"].
+    collect: list[str] = Field(default_factory=list)
 
 
 class ScenarioSummary(BaseModel):
@@ -53,6 +55,7 @@ class ScenarioSummary(BaseModel):
     avatar: str | None = None
     greeting: str = ""
     speed: float = 1.0
+    collect: list[str] = Field(default_factory=list)
 
 
 class ScenariosResponse(BaseModel):
@@ -75,6 +78,7 @@ def _row_to_scenario(row) -> Scenario:
         greeting=row["greeting"],
         rules=row["rules"],
         data=json_column(row, "data", {}),
+        collect=json_column(row, "collect", []),
         mcp=json_column(row, "mcp", []),
         tools=json_column(row, "tools", None),
         model=row["model"],
@@ -107,14 +111,14 @@ def save_scenario(scenario: Scenario) -> Scenario:
             """
             INSERT INTO scenarios
                 (slug, name, description, language, voice, avatar, greeting, rules, data, mcp, tools,
-                 model, speed, published)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 model, speed, published, collect)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(slug) DO UPDATE SET
                 name = excluded.name, description = excluded.description, language = excluded.language,
                 voice = excluded.voice, avatar = excluded.avatar, greeting = excluded.greeting,
                 rules = excluded.rules, data = excluded.data, mcp = excluded.mcp, tools = excluded.tools,
                 model = excluded.model, speed = excluded.speed, published = excluded.published,
-                updated_at = datetime('now')
+                collect = excluded.collect, updated_at = datetime('now')
             """,
             (
                 scenario.slug,
@@ -131,6 +135,7 @@ def save_scenario(scenario: Scenario) -> Scenario:
                 scenario.model,
                 scenario.speed,
                 int(scenario.published),
+                json.dumps(scenario.collect),
             ),
         )
     return scenario

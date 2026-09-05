@@ -12,7 +12,9 @@ const PIZZERIA = {
   language: "en-US",
   voice: "en_US-ryan-high",
   avatar: null,
-  greeting: "Tony's Pizzeria!"
+  greeting: "Tony's Pizzeria!",
+  speed: 1,
+  collect: []
 };
 
 describe("fetchScenario", () => {
@@ -58,5 +60,17 @@ describe("slugify", () => {
 
   it("returns an empty slug for a name with nothing usable", () => {
     expect(slugify("!!!")).toBe("");
+  });
+});
+
+describe("fetchScenario", () => {
+  it("carries the fields the summary card renders", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...PIZZERIA, collect: ["phone", "items"] }) })
+    );
+
+    const scenario = await fetchScenario("http://localhost:8000", "pizzeria");
+    expect(scenario.collect).toEqual(["phone", "items"]);
   });
 });

@@ -105,6 +105,14 @@ Third-party servers are untrusted on two axes: what they return (prompt injectio
 
 Two things to know when writing scenario rules: the demo datasets are deliberately fake, and no conversation is persisted — an order is summarized on screen and discarded. Keep it that way, or the doctor and telecom scenarios start collecting real personal data.
 
+### Streaming and the call summary
+
+`POST /chat/stream` sends the reply as server-sent events — `delta` for text, `tool` when a lookup completes, `done` at the end — and the web app speaks each sentence as it finishes rather than waiting for the whole reply. Chunks are synthesized in order and queued, so a streamed answer is heard as one continuous utterance. `POST /chat` still returns a whole reply for non-browser callers.
+
+A scenario's `collect` field lists what the call is meant to come away with (`["phone", "items", "total"]`). **End call** then asks the model once, at the end, to extract those fields from the transcript, and the recap shows which were filled and which the caller never gave. Nothing is persisted: the summary is shown and discarded with the page.
+
+If you deploy behind a proxy, make sure it does not buffer `text/event-stream`, or the reply will arrive all at once and the streaming gain is lost.
+
 ## Speech to text
 
 `POST /stt/transcribe` transcribes a recording with Whisper (`faster-whisper`) on the same machine as everything else. The browser's own recognition is a cloud service — Chromium sends the audio to Google — which sits badly with a stack whose point is that inference stays where you put it, so the server engine is the default and the browser one is a fallback.

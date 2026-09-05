@@ -8,16 +8,46 @@
   "data": {
     "currency": "EUR",
     "menu": [
-      { "item": "Margherita", "small": 9.0, "large": 13.5 },
-      { "item": "Napoletana", "small": 10.5, "large": 15.0 },
-      { "item": "Quattro Formaggi", "small": 12.0, "large": 16.5 },
-      { "item": "Diavola", "small": 11.5, "large": 16.0 },
-      { "item": "Vegetariana", "small": 11.0, "large": 15.5 },
-      { "item": "Calzone", "small": 12.5, "large": null }
+      {
+        "item": "Margherita",
+        "small": 9.0,
+        "large": 13.5
+      },
+      {
+        "item": "Napoletana",
+        "small": 10.5,
+        "large": 15.0
+      },
+      {
+        "item": "Quattro Formaggi",
+        "small": 12.0,
+        "large": 16.5
+      },
+      {
+        "item": "Diavola",
+        "small": 11.5,
+        "large": 16.0
+      },
+      {
+        "item": "Vegetariana",
+        "small": 11.0,
+        "large": 15.5
+      },
+      {
+        "item": "Calzone",
+        "small": 12.5,
+        "large": null
+      }
     ],
     "drinks": [
-      { "item": "San Pellegrino 50cl", "price": 3.0 },
-      { "item": "Peroni 33cl", "price": 4.5 }
+      {
+        "item": "San Pellegrino 50cl",
+        "price": 3.0
+      },
+      {
+        "item": "Peroni 33cl",
+        "price": 4.5
+      }
     ],
     "offers": [
       "Two large pizzas for 25 EUR, Tuesdays only.",
@@ -26,6 +56,18 @@
     "opening_hours": "18:00 to 23:00, closed Mondays.",
     "minimum_order": 15.0
   },
-  "mcp": ["pizzeria"],
-  "tools": ["check_delivery", "check_order"]
+  "collect": [
+    "phone",
+    "items",
+    "total",
+    "address",
+    "delivery_time"
+  ],
+  "mcp": [
+    "pizzeria"
+  ],
+  "tools": [
+    "check_delivery",
+    "check_order"
+  ]
 }

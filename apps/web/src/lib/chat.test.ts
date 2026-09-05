@@ -1,56 +1,77 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendChatMessage } from "./chat";
+import { streamChatMessage } from "./chat";
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("sendChatMessage", () => {
-  it("posts chat payloads with optional BYO key", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ content: "Hello." })
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const message = await sendChatMessage({
-      apiBaseUrl: "http://localhost:8000",
-      apiKey: " demo-key ",
-      persona: "Be concise.",
-      model: "hermes-3-8b-tee",
-      messages: [{ role: "user", content: "Hi" }]
-    });
-
-    expect(message).toEqual({ role: "assistant", content: "Hello.", toolCalls: [] });
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/chat",
-      expect.objectContaining({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-LibertAI-API-Key": "demo-key"
+describe("streamChatMessage", () => {
+  function streamOf(...frames: string[]): ReadableStream<Uint8Array> {
+    const encoder = new TextEncoder();
+    return new ReadableStream({
+      start(controller) {
+        for (const frame of frames) {
+          controller.enqueue(encoder.encode(frame));
         }
-      })
-    );
-  });
+        controller.close();
+      }
+    });
+  }
 
-  it("uses backend error details when available", async () => {
+  async function drain(input: Parameters<typeof streamChatMessage>[0]) {
+    const events = [];
+    for await (const event of streamChatMessage(input)) {
+      events.push(event);
+    }
+    return events;
+  }
+
+  const input = {
+    apiBaseUrl: "http://localhost:8000",
+    persona: "",
+    model: "m",
+    messages: [{ role: "user" as const, content: "Hi" }],
+    scenario: "pizzeria"
+  };
+
+  it("yields each event in order", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: async () => ({ detail: "Missing key" })
+        ok: true,
+        body: streamOf(
+          'data: {"type":"delta","text":"Good "}\n\n',
+          'data: {"type":"delta","text":"evening."}\n\n',
+          'data: {"type":"done","content":"Good evening.","model":"m"}\n\n'
+        )
       })
     );
 
-    await expect(
-      sendChatMessage({
-        apiBaseUrl: "http://localhost:8000",
-        persona: "",
-        model: "model",
-        messages: [{ role: "user", content: "Hi" }]
+    await expect(drain(input)).resolves.toEqual([
+      { type: "delta", text: "Good " },
+      { type: "delta", text: "evening." },
+      { type: "done", content: "Good evening.", model: "m" }
+    ]);
+  });
+
+  it("reassembles an event split across network chunks", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: streamOf('data: {"type":"del', 'ta","text":"split"}\n\n')
       })
-    ).rejects.toThrow("Missing key");
+    );
+
+    await expect(drain(input)).resolves.toEqual([{ type: "delta", text: "split" }]);
+  });
+
+  it("surfaces a refusal before the stream starts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ detail: "Missing key" }) })
+    );
+
+    await expect(drain(input)).rejects.toThrow("Missing key");
   });
 });

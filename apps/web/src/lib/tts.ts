@@ -133,3 +133,49 @@ export function thinkingAloud(language: string): string {
   const base = language.split(/[-_]/)[0] ?? "";
   return THINKING_ALOUD[base] ?? THINKING_ALOUD.en!;
 }
+
+const SENTENCE_END = /[.!?…]["')\]]?\s|\n/;
+/** Speak a long clause rather than waiting indefinitely for punctuation that may not come. */
+const MAX_CHUNK = 220;
+const MIN_CHUNK = 12;
+
+/**
+ * Split streamed text into speakable chunks, returning what is left over.
+ *
+ * Args:
+ *   buffer: Text accumulated so far.
+ *   flush: Take everything, because the reply has finished.
+ */
+export function takeSpeakable(buffer: string, flush = false): [string[], string] {
+  const chunks: string[] = [];
+  let rest = buffer;
+
+  while (rest.length > 0) {
+    const match = SENTENCE_END.exec(rest);
+    if (match && match.index + match[0].length >= MIN_CHUNK) {
+      chunks.push(rest.slice(0, match.index + match[0].length).trim());
+      rest = rest.slice(match.index + match[0].length);
+      continue;
+    }
+
+    if (rest.length >= MAX_CHUNK) {
+      // No sentence end in sight: break at the last space so a word is not cut in half.
+      const space = rest.lastIndexOf(" ", MAX_CHUNK);
+      const cut = space > MIN_CHUNK ? space : MAX_CHUNK;
+      chunks.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut);
+      continue;
+    }
+
+    break;
+  }
+
+  if (flush) {
+    if (rest.trim()) {
+      chunks.push(rest.trim());
+    }
+    rest = "";
+  }
+
+  return [chunks.filter(Boolean), rest];
+}

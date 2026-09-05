@@ -7,6 +7,7 @@ export type ScenarioSummary = {
   avatar: string | null;
   greeting: string;
   speed: number;
+  collect: string[];
 };
 
 export type Scenario = ScenarioSummary & {
@@ -167,6 +168,7 @@ export function emptyScenario(): Scenario {
     avatar: null,
     greeting: "",
     speed: 1,
+    collect: [],
     rules: "",
     data: {},
     mcp: [],

@@ -579,3 +579,86 @@
 .settingsNote a {
   color: var(--accent);
 }
+
+.summary {
+  display: grid;
+  gap: 10px;
+  margin: 0 20px 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  font-size: 13px;
+}
+
+.summary header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: none;
+}
+
+.summary header button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 9px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.summary dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.summaryFilled,
+.summaryMissing {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.summary dt {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.summary dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.summaryMissing dd {
+  color: #6f7d86;
+  font-style: italic;
+}
+
+.summary p {
+  margin: 4px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.endCallButton {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 0 14px;
+  height: 44px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.endCallButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

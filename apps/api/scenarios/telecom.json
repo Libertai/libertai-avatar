@@ -9,10 +9,22 @@
     "company": "Nova Telecom",
     "support_hours": "08:00 to 20:00, seven days a week.",
     "plans": [
-      { "plan": "Mobile 50GB", "monthly_eur": 14.99 },
-      { "plan": "Mobile 200GB", "monthly_eur": 22.99 },
-      { "plan": "Fibre 500", "monthly_eur": 29.99 },
-      { "plan": "Fibre 2000", "monthly_eur": 42.99 }
+      {
+        "plan": "Mobile 50GB",
+        "monthly_eur": 14.99
+      },
+      {
+        "plan": "Mobile 200GB",
+        "monthly_eur": 22.99
+      },
+      {
+        "plan": "Fibre 500",
+        "monthly_eur": 29.99
+      },
+      {
+        "plan": "Fibre 2000",
+        "monthly_eur": 42.99
+      }
     ],
     "policies": {
       "notice_period": "30 days to cancel or change a plan.",
@@ -21,6 +33,17 @@
     },
     "demo_accounts": "40012345 is active, 40067890 is suspended for non-payment."
   },
-  "mcp": ["telecom"],
-  "tools": ["check_account", "check_network", "list_upgrades"]
+  "collect": [
+    "account_number",
+    "issue",
+    "resolution"
+  ],
+  "mcp": [
+    "telecom"
+  ],
+  "tools": [
+    "check_account",
+    "check_network",
+    "list_upgrades"
+  ]
 }

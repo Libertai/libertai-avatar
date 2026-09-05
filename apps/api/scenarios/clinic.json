@@ -14,6 +14,20 @@
     "parking": "Street parking; a paid car park is 200m away on rue Oberkampf.",
     "cancellation_policy": "Cancel at least 24 hours ahead, otherwise the consultation is charged."
   },
-  "mcp": ["clinic"],
-  "tools": ["list_doctors", "list_availability", "book_appointment", "check_appointment"]
+  "collect": [
+    "patient_name",
+    "phone",
+    "doctor",
+    "appointment",
+    "reference"
+  ],
+  "mcp": [
+    "clinic"
+  ],
+  "tools": [
+    "list_doctors",
+    "list_availability",
+    "book_appointment",
+    "check_appointment"
+  ]
 }

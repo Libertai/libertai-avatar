@@ -33,6 +33,7 @@ SCHEMA = [
         model       TEXT,
         speed       REAL NOT NULL DEFAULT 1.0,
         published   INTEGER NOT NULL DEFAULT 1,
+        collect     TEXT NOT NULL DEFAULT '[]',
         created_at  TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )
@@ -68,10 +69,23 @@ def connect() -> Iterator[sqlite3.Connection]:
         connection.close()
 
 
+# Columns added after the first release. CREATE TABLE IF NOT EXISTS skips an existing
+# table entirely, so a database made before them needs each one added.
+ADDED_COLUMNS = {
+    "scenarios": {"collect": "TEXT NOT NULL DEFAULT '[]'"},
+}
+
+
 def migrate() -> None:
     with connect() as connection:
         for statement in SCHEMA:
             connection.execute(statement)
+
+        for table, columns in ADDED_COLUMNS.items():
+            present = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+            for column, definition in columns.items():
+                if column not in present:
+                    connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def json_column(row: sqlite3.Row, column: str, default: Any) -> Any:

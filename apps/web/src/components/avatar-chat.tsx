@@ -8,7 +8,7 @@ import Link from "next/link";
 import { ChangeEvent, Component, FormEvent, ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { AnimationMixer, Euler, Quaternion } from "three";
 import type { Group } from "three";
-import { sendChatMessage, type ToolCallRecord } from "../lib/chat";
+import { streamChatMessage, summarizeCall, type CallSummary, type ToolCallRecord } from "../lib/chat";
 import { loadGestureClip } from "../lib/gestures";
 import type { ScenarioSummary } from "../lib/scenarios";
 import { fetchSttStatus, recordingMimeType, transcribeAudio } from "../lib/stt";
@@ -17,6 +17,7 @@ import {
   languageLabel,
   synthesizeSpeech,
   toBcp47,
+  takeSpeakable,
   thinkingAloud,
   visemeWeightsAt,
   voicePreviewText,
@@ -120,6 +121,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   const [serverStt, setServerStt] = useState(false);
   const [listenPreference, setListenPreference] = useState<Engine>("server");
   const [transcribing, setTranscribing] = useState(false);
+  const [streamed, setStreamed] = useState<string | null>(null);
+  const [summary, setSummary] = useState<CallSummary | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
   const [gestureUrl, setGestureUrl] = useState("");
   const [gestureFileName, setGestureFileName] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<ToolCallRecord[]>([]);
@@ -140,6 +144,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     visemes: Viseme[];
     startedAt: number;
   } | null>(null);
+  const contextRef = useRef<AudioContext | null>(null);
+  const queueRef = useRef<{ audio: ArrayBuffer; visemes: Viseme[]; turn: number }[]>([]);
+  const synthesisRef = useRef<Promise<void>>(Promise.resolve());
   const levelsRef = useRef<Uint8Array<ArrayBuffer>>(new Uint8Array(0));
 
   const canSpeak = voices.length > 0;
@@ -207,7 +214,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       }
       if (audioRef.current) {
         audioRef.current.source.onended = null;
-        void audioRef.current.context.close();
+      }
+      if (contextRef.current) {
+        void contextRef.current.close();
       }
       const meter = micMeterRef.current;
       if (meter) {
@@ -275,6 +284,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
 
     stopDictation();
     setToolCalls([]);
+    setStreamed(null);
 
     const nextMessages: Message[] = [...messages, { role: "user", content: trimmed }];
     setMessages(nextMessages);
@@ -296,7 +306,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       : null;
 
     try {
-      const assistant = await sendChatMessage({
+      const stream = streamChatMessage({
         apiBaseUrl: API_BASE_URL,
         apiKey,
         persona: scenario ? "" : `${persona}\n\nReply in ${languageLabel(language)}.`,
@@ -304,12 +314,47 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
         messages: nextMessages,
         scenario: scenario?.slug
       });
-      setToolCalls(assistant.toolCalls);
-      turnRef.current += 1;
-      setMessages([...nextMessages, assistant]);
-      speak(assistant.content);
+
+      let spoken = "";
+      let buffer = "";
+      const calls: ToolCallRecord[] = [];
+
+      for await (const event of stream) {
+        if (event.type === "error") {
+          throw new Error(event.detail);
+        }
+        if (event.type === "tool") {
+          calls.push({ name: event.name, arguments: event.arguments, result: event.result });
+          setToolCalls([...calls]);
+          continue;
+        }
+        if (event.type === "delta") {
+          // The first token ends the wait, so the filler must not start now.
+          turnRef.current = turn;
+          spoken += event.text;
+          setStreamed(spoken);
+
+          buffer += event.text;
+          const [chunks, rest] = takeSpeakable(buffer);
+          buffer = rest;
+          for (const chunk of chunks) {
+            speakChunk(chunk, turn);
+          }
+          continue;
+        }
+
+        // done
+        const [chunks] = takeSpeakable(buffer, true);
+        for (const chunk of chunks) {
+          speakChunk(chunk, turn);
+        }
+        const content = event.content || spoken;
+        setStreamed(null);
+        setMessages([...nextMessages, { role: "assistant", content }]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to reach the avatar API.");
+      setStreamed(null);
       setMessages(messages);
     } finally {
       if (filler !== null) {
@@ -327,13 +372,28 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       window.clearInterval(keepAliveRef.current);
       keepAliveRef.current = null;
     }
+    // Drop anything queued or playing, but keep the context: it is reused for the next
+    // utterance, and browsers cap how many can be open.
+    queueRef.current = [];
     if (audioRef.current) {
       audioRef.current.source.onended = null;
       audioRef.current.source.stop();
-      void audioRef.current.context.close();
       audioRef.current = null;
     }
     setIsSpeaking(false);
+  }
+
+  /** Speak one chunk of a streaming reply, appended to whatever is already playing. */
+  function speakChunk(text: string, turn: number) {
+    if (!voiceEnabled || !text.trim()) {
+      return;
+    }
+    if (engine === "server") {
+      void enqueueSpeech(text, turn);
+      return;
+    }
+    // speechSynthesis keeps its own queue, so chunks follow one another without cancelling.
+    utterInBrowser(text, { continuation: true });
   }
 
   function speak(text: string, turn?: number) {
@@ -351,47 +411,89 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     utterInBrowser(text);
   }
 
+  function audioContext(): AudioContext {
+    if (!contextRef.current || contextRef.current.state === "closed") {
+      contextRef.current = new AudioContext();
+    }
+    void contextRef.current.resume();
+    return contextRef.current;
+  }
+
   async function utterOnServer(text: string, turn?: number) {
     if (!selectedServerVoice) {
       setError("No server voices are available. Add a Piper .onnx voice file to apps/api/voices.");
       return;
     }
 
-    try {
-      const speech = await synthesizeSpeech({
-        apiBaseUrl: API_BASE_URL,
-        text,
-        voice: selectedServerVoice.id,
-        speed,
-        speaker: speaker < selectedServerVoice.speakers ? speaker : 0
-      });
-      // The turn moved on while this was synthesizing: playing it now would stop whatever
-      // is speaking and talk over the answer.
-      if (turn !== undefined && turnRef.current !== turn) {
-        return;
-      }
-      stopSpeaking();
+    stopSpeaking();
+    await enqueueSpeech(text, turn ?? turnRef.current);
+  }
 
-      const context = new AudioContext();
-      const buffer = await context.decodeAudioData(speech.audio);
-      const source = context.createBufferSource();
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 256;
-      levelsRef.current = new Uint8Array(analyser.frequencyBinCount);
-
-      source.buffer = buffer;
-      source.connect(analyser);
-      analyser.connect(context.destination);
-      source.onended = stopSpeaking;
-
-      const startedAt = context.currentTime;
-      audioRef.current = { context, source, analyser, visemes: speech.visemes, startedAt };
-      setIsSpeaking(true);
-      source.start();
-    } catch (err) {
-      stopSpeaking();
-      setError(err instanceof Error ? err.message : "Server speech synthesis failed.");
+  /**
+   * Synthesize one chunk and queue it. Synthesis is chained so chunks are spoken in the
+   * order they were written, however long each one takes to come back.
+   */
+  function enqueueSpeech(text: string, turn: number): Promise<void> {
+    if (!selectedServerVoice || !text.trim()) {
+      return Promise.resolve();
     }
+
+    const voice = selectedServerVoice;
+    synthesisRef.current = synthesisRef.current
+      .then(async () => {
+        if (turnRef.current !== turn) {
+          return;
+        }
+        const speech = await synthesizeSpeech({
+          apiBaseUrl: API_BASE_URL,
+          text,
+          voice: voice.id,
+          speed,
+          speaker: speaker < voice.speakers ? speaker : 0
+        });
+        if (turnRef.current !== turn) {
+          return;
+        }
+        queueRef.current.push({ audio: speech.audio, visemes: speech.visemes, turn });
+        if (!audioRef.current) {
+          await playNext();
+        }
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Server speech synthesis failed.");
+      });
+
+    return synthesisRef.current;
+  }
+
+  /** Play the next queued chunk, so a streamed reply is heard as one continuous utterance. */
+  async function playNext(): Promise<void> {
+    const next = queueRef.current.shift();
+    if (!next || turnRef.current !== next.turn) {
+      queueRef.current = [];
+      audioRef.current = null;
+      setIsSpeaking(false);
+      return;
+    }
+
+    const context = audioContext();
+    const buffer = await context.decodeAudioData(next.audio);
+    const source = context.createBufferSource();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    levelsRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+    source.buffer = buffer;
+    source.connect(analyser);
+    analyser.connect(context.destination);
+    source.onended = () => {
+      audioRef.current = null;
+      void playNext();
+    };
+
+    audioRef.current = { context, source, analyser, visemes: next.visemes, startedAt: context.currentTime };
+    setIsSpeaking(true);
+    source.start();
   }
 
   /** Mouth shapes for the current instant: phoneme-accurate when the server supplied a
@@ -414,7 +516,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     return { aa: Math.min(1, (peak / 128) * 2.2), ih: 0, ou: 0, ee: 0, oh: 0 };
   }
 
-  function utterInBrowser(text: string) {
+  function utterInBrowser(text: string, options: { continuation?: boolean } = {}) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
@@ -425,7 +527,9 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       return;
     }
 
-    synth.cancel();
+    if (!options.continuation) {
+      synth.cancel();
+    }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang;
@@ -434,7 +538,11 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
       setIsSpeaking(true);
       keepAliveRef.current = window.setInterval(() => synth.resume(), 10_000);
     };
-    utterance.onend = stopSpeaking;
+    utterance.onend = () => {
+      if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+        stopSpeaking();
+      }
+    };
     utterance.onerror = (event) => {
       stopSpeaking();
       setError(`Speech synthesis failed: ${event.error}`);
@@ -631,6 +739,25 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
     transcriptRef.current = "";
     prefixRef.current = draft.trim();
     recognition.start();
+  }
+
+  /** End the call and show what it collected, which is what a scenario is for. */
+  async function endCall() {
+    if (!scenario) {
+      return;
+    }
+
+    stopSpeaking();
+    setSummarizing(true);
+    try {
+      setSummary(
+        await summarizeCall({ apiBaseUrl: API_BASE_URL, scenario: scenario.slug, messages, apiKey })
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not summarize the call.");
+    } finally {
+      setSummarizing(false);
+    }
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -899,12 +1026,37 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
               </article>
             ))
           )}
-          {isLoading ? (
+          {streamed ? (
+            <article dir="auto" className={styles.assistantMessage}>
+              {streamed}
+            </article>
+          ) : null}
+          {isLoading && !streamed ? (
             <div className={styles.loading}>
               <Loader2 size={18} /> Waiting for LibertAI
             </div>
           ) : null}
         </div>
+
+        {summary ? (
+          <div className={styles.summary}>
+            <header>
+              <strong>Call summary</strong>
+              <button type="button" onClick={() => setSummary(null)}>
+                Dismiss
+              </button>
+            </header>
+            <dl>
+              {Object.entries(summary.fields).map(([field, value]) => (
+                <div key={field} className={value ? styles.summaryFilled : styles.summaryMissing}>
+                  <dt>{field.replace(/_/g, " ")}</dt>
+                  <dd dir="auto">{value || "not given"}</dd>
+                </div>
+              ))}
+            </dl>
+            {summary.outcome ? <p dir="auto">{summary.outcome}</p> : null}
+          </div>
+        ) : null}
 
         {toolCalls.length > 0 ? (
           <div className={styles.toolCalls}>
@@ -976,6 +1128,17 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
                 </button>
               ))}
             </div>
+            {scenario && scenario.collect.length > 0 ? (
+              <button
+                className={styles.endCallButton}
+                type="button"
+                onClick={() => void endCall()}
+                disabled={summarizing || messages.length < 2}
+                title="End the call and summarize what was collected"
+              >
+                {summarizing ? "Summarizing…" : "End call"}
+              </button>
+            ) : null}
             <button
               className={styles.iconButton}
               type="button"
