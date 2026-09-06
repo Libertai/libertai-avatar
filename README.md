@@ -68,6 +68,7 @@ Four ship as examples, each with its own MCP server:
 | `/s/clinic` | Clinique Saint-Jean — appointments | French | availability, booking, lookup |
 | `/s/telecom` | Nova Telecom — billing and support | English | account, network, upgrades |
 | `/s/flights` | Aviva Air — flight booking | English | search, booking, lookup |
+| `/s/researcher` | Web Research Assistant | English | live web search |
 
 Manage them at **`/scenarios`**: create, edit, duplicate, publish, copy link, delete. Register MCP servers at **`/scenarios/servers`**, with a **Test connection** button that opens a real session and lists the tools it found — worth clicking before a demo.
 
@@ -84,6 +85,17 @@ Drafts (`published: false`) are hidden from the public list but stay reachable b
 Scenario and MCP editing decide which prompts run and which servers the API contacts, so they are administrative. Set `ADMIN_TOKEN` and the endpoints require an `X-Admin-Token` header; the UI keeps the token in the browser only.
 
 Left unset, the endpoints stay open — convenient locally, and the scenarios page shows a standing warning so an unprotected deployment is obvious rather than silent. `GET /health` reports `admin_protected` for a deployment check.
+
+### Web search
+
+An avatar can also search the live web through [LibertAI's search API](https://docs.libertai.io/apis/search/usage.html), which queries several engines at once and deduplicates by URL. Two tools are offered when it is enabled:
+
+- `web_search(query, search_type)` — `web`, `news`, `images` or `academic`. Results are rendered as numbered title/URL/snippet entries, and a result returned by more than one engine says so, since cross-engine agreement is the only ranking signal the model gets.
+- `fetch_page(url)` — the readable text of one page, for when a snippet is not enough. Only `http` and `https` are accepted, and the text is truncated so one long article cannot fill the context.
+
+Turn it on per scenario (**Web search** in the editor) or, on the sandbox at `/`, in settings. It is off by default: a pizzeria taking orders has no business browsing the web.
+
+Search bills against the same LibertAI key as inference. It is gated by its own flag rather than the MCP tool allowlist, so a scenario can allow one MCP tool and still search. Web pages are untrusted input, and the system prompt says so explicitly.
 
 ### MCP tools
 

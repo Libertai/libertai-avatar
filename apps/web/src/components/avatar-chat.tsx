@@ -124,6 +124,7 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
   const [streamed, setStreamed] = useState<string | null>(null);
   const [summary, setSummary] = useState<CallSummary | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const [gestureUrl, setGestureUrl] = useState("");
   const [gestureFileName, setGestureFileName] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<ToolCallRecord[]>([]);
@@ -312,7 +313,8 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
         persona: scenario ? "" : `${persona}\n\nReply in ${languageLabel(language)}.`,
         model,
         messages: nextMessages,
-        scenario: scenario?.slug
+        scenario: scenario?.slug,
+        search: scenario ? undefined : webSearch
       });
 
       let spoken = "";
@@ -855,6 +857,17 @@ export default function AvatarChat({ scenario }: { scenario?: ScenarioSummary })
               BYO LibertAI key
               <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} type="password" autoComplete="off" />
             </label>
+            {scenario ? null : (
+              <label className={styles.settingsToggle}>
+                <input
+                  type="checkbox"
+                  checked={webSearch}
+                  onChange={(event) => setWebSearch(event.target.checked)}
+                />
+                Web search
+                <small>Let the avatar search the web and read pages when it needs current facts.</small>
+              </label>
+            )}
             <label>
               Language
               <select

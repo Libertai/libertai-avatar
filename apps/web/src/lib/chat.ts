@@ -24,6 +24,7 @@ export type SendChatInput = {
   model: string;
   apiKey?: string;
   scenario?: string;
+  search?: boolean;
 };
 
 export type ChatEvent =
@@ -49,7 +50,8 @@ export async function* streamChatMessage(input: SendChatInput): AsyncGenerator<C
       persona: input.persona,
       model: input.model,
       messages: input.messages,
-      scenario: input.scenario
+      scenario: input.scenario,
+      search: input.search
     })
   });
 

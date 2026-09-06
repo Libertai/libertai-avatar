@@ -662,3 +662,29 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.settingsToggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settingsToggle input {
+  width: auto;
+}
+
+.settingsToggle small {
+  grid-column: 2;
+  color: #6f7d86;
+  font-size: 12px;
+}
+
+.toolCall span {
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

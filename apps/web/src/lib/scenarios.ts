@@ -17,6 +17,7 @@ export type Scenario = ScenarioSummary & {
   tools: string[] | null;
   model: string | null;
   published: boolean;
+  search: boolean;
 };
 
 export type McpServer = {
@@ -174,7 +175,8 @@ export function emptyScenario(): Scenario {
     mcp: [],
     tools: null,
     model: null,
-    published: false
+    published: false,
+    search: false
   };
 }
 

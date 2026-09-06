@@ -293,6 +293,15 @@ export default function ScenarioEditor({ initial }: { initial?: Scenario }) {
         <label className={styles.checkbox}>
           <input
             type="checkbox"
+            checked={scenario.search}
+            onChange={(event) => update({ search: event.target.checked })}
+          />
+          Web search — the avatar can search the web and read pages when it needs current facts.
+        </label>
+
+        <label className={styles.checkbox}>
+          <input
+            type="checkbox"
             checked={scenario.published}
             onChange={(event) => update({ published: event.target.checked })}
           />

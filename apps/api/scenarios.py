@@ -42,6 +42,8 @@ class Scenario(BaseModel):
     published: bool = True
     # What the avatar is meant to come away with, e.g. ["phone", "items", "address"].
     collect: list[str] = Field(default_factory=list)
+    # Whether the avatar may search the web, on top of any MCP tools.
+    search: bool = False
 
 
 class ScenarioSummary(BaseModel):
@@ -79,6 +81,7 @@ def _row_to_scenario(row) -> Scenario:
         rules=row["rules"],
         data=json_column(row, "data", {}),
         collect=json_column(row, "collect", []),
+        search=bool(row["search"]),
         mcp=json_column(row, "mcp", []),
         tools=json_column(row, "tools", None),
         model=row["model"],
@@ -111,14 +114,14 @@ def save_scenario(scenario: Scenario) -> Scenario:
             """
             INSERT INTO scenarios
                 (slug, name, description, language, voice, avatar, greeting, rules, data, mcp, tools,
-                 model, speed, published, collect)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 model, speed, published, collect, search)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(slug) DO UPDATE SET
                 name = excluded.name, description = excluded.description, language = excluded.language,
                 voice = excluded.voice, avatar = excluded.avatar, greeting = excluded.greeting,
                 rules = excluded.rules, data = excluded.data, mcp = excluded.mcp, tools = excluded.tools,
                 model = excluded.model, speed = excluded.speed, published = excluded.published,
-                collect = excluded.collect, updated_at = datetime('now')
+                collect = excluded.collect, search = excluded.search, updated_at = datetime('now')
             """,
             (
                 scenario.slug,
@@ -136,6 +139,7 @@ def save_scenario(scenario: Scenario) -> Scenario:
                 scenario.speed,
                 int(scenario.published),
                 json.dumps(scenario.collect),
+                int(scenario.search),
             ),
         )
     return scenario

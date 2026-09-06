@@ -34,6 +34,7 @@ SCHEMA = [
         speed       REAL NOT NULL DEFAULT 1.0,
         published   INTEGER NOT NULL DEFAULT 1,
         collect     TEXT NOT NULL DEFAULT '[]',
+        search      INTEGER NOT NULL DEFAULT 0,
         created_at  TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )
@@ -72,7 +73,10 @@ def connect() -> Iterator[sqlite3.Connection]:
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS skips an existing
 # table entirely, so a database made before them needs each one added.
 ADDED_COLUMNS = {
-    "scenarios": {"collect": "TEXT NOT NULL DEFAULT '[]'"},
+    "scenarios": {
+        "collect": "TEXT NOT NULL DEFAULT '[]'",
+        "search": "INTEGER NOT NULL DEFAULT 0",
+    },
 }
 
 
